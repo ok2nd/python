@@ -5,12 +5,14 @@
 
 【モデル速度比較】
   Real-ESRGAN     (CNN系)         ← 推奨: 数秒で処理。Upscayl と同等モデル
+  SwinIR          (Transformer系) ← 中間: Real-ESRGANより高画質、DRCTより高速
   DRCT-L          (Transformer系) ← 最高画質だが数分かかる
   HAT             (Transformer系) ← 最高画質だが数分かかる
 
 【ダウンロード方法】
   python download_model.py          -- 対話式メニュー
   python download_model.py esrgan   -- Real-ESRGAN のみ (推奨・高速)
+  python download_model.py swinir   -- SwinIR のみ
   python download_model.py drct     -- DRCT モデルのみ
   python download_model.py all      -- 全モデル
 """
@@ -98,6 +100,34 @@ MODELS = {
         "size":     "約 150 MB",
         "scale":    4,
         "speed":    "★ 低速 (数分)",
+    },
+    # ════════════════════════════════════════════════
+    # SwinIR 系 (Transformer系・中間画質・中間速度)
+    # ════════════════════════════════════════════════
+    "swinir_real_large": {
+        "filename": "003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN.pth",
+        "urls": [
+            "https://huggingface.co/mikestealth/SwinIR/resolve/main/003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN.pth",
+            "https://huggingface.co/BarrenWardo/Upscalers/resolve/main/003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN.pth",
+            "https://huggingface.co/mp3pintyo/upscale/resolve/main/003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN.pth",
+        ],
+        "label":    "SwinIR-L Real-World x4 GAN (実写真・大型)",
+        "desc":     "ICCV 2021。Real-ESRGANより高画質、DRCTより高速。実写真向け大型モデル",
+        "size":     "約 142 MB",
+        "scale":    4,
+        "speed":    "★★ 中速 (30秒〜2分)",
+    },
+    "swinir_real_medium": {
+        "filename": "003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x4_GAN.pth",
+        "urls": [
+            "https://huggingface.co/mikestealth/SwinIR/resolve/main/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x4_GAN.pth",
+            "https://huggingface.co/BarrenWardo/Upscalers/resolve/main/003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x4_GAN.pth",
+        ],
+        "label":    "SwinIR-M Real-World x4 GAN (実写真・標準)",
+        "desc":     "SwinIR中型モデル。大型より軽量で高速。バランス重視",
+        "size":     "約 47 MB",
+        "scale":    4,
+        "speed":    "★★ 中速 (10〜30秒)",
     },
 }
 
@@ -213,8 +243,9 @@ def interactive_menu():
     print("  高画質化モデルダウンローダー")
     print("=" * 62)
     print()
-    print("  ★ 高速モデル (Real-ESRGAN / CNN系) — Upscayl と同じ種類")
-    print("  ☆ 高画質モデル (DRCT・HAT / Transformer系) — 数分かかる")
+    print("  ★ 高速モデル (Real-ESRGAN / CNN系)     — 数秒")
+    print("  ★★ 中速モデル (SwinIR / Transformer系)  — 10秒〜2分")
+    print("  ☆ 高画質モデル (DRCT・HAT / Transformer系) — 数分")
     print()
 
     items = list(MODELS.items())
@@ -258,6 +289,9 @@ def main():
             download_model(k)
     elif cmd == "esrgan":
         for k in ["realesrgan_x4", "realesrgan_x4_anime", "realesrgan_x2"]:
+            download_model(k)
+    elif cmd == "swinir":
+        for k in ["swinir_real_large", "swinir_real_medium"]:
             download_model(k)
     elif cmd in ("drct", "drct_real"):
         download_model("drct_real")

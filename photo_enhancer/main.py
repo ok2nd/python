@@ -41,8 +41,7 @@ MODELS_DIR  = Path(__file__).parent / "models"
 WINDOW_SIZE = 16    # Transformerアテンションウィンドウサイズ (16の倍数にパディング)
 # Real-ESRGAN (CNN) : 1024 推奨 → 1200x1200 画像を 4 タイルで処理
 # DRCT/HAT (Transformer): 768 推奨 → VRAM 約 4GB
-TILE_SIZE   = 1200  # CNN モデルは大きいほど速い (VRAM 約 2GB)
-# TILE_SIZE  = 1024  # CNN モデルは大きいほど速い (VRAM 約 2GB)
+TILE_SIZE   = 1024  # CNN モデルは大きいほど速い (VRAM 約 2GB)
 # TILE_SIZE = 768   # DRCT/HAT で VRAM 不足の場合
 # TILE_SIZE = 512   # VRAM 不足時
 # TILE_SIZE = 256   # VRAM 不足時 (最小)
@@ -672,9 +671,11 @@ class MainWindow(QMainWindow):
         SPEED_TAGS = {
             "realesrgan": "⚡ 高速",
             "esrgan":     "⚡ 高速",
+            "swinir-l":   "🚶 中速",
+            "swinir-m":   "🚶 中速",
+            "swinir":     "🚶 中速",
             "drct":       "🐢 低速",
             "hat":        "🐢 低速",
-            "swinir":     "🐢 低速",
         }
         self._model_combo.clear()
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -690,13 +691,7 @@ class MainWindow(QMainWindow):
                 self._model_combo.addItem(f"{f.name}{tag}", userData=str(f))
         else:
             self._model_combo.addItem("モデルなし — download_model.py を実行")
-            
-        DEFAULT_MODEL = "RealESRGAN_x4plus.pth"
-        for i in range(self._model_combo.count()):
-            if DEFAULT_MODEL in (self._model_combo.itemData(i) or ""):
-                self._model_combo.setCurrentIndex(i)
-                break
-                
+
     def _get_model_path(self) -> Optional[Path]:
         idx = self._model_combo.currentIndex()
         data = self._model_combo.itemData(idx)
