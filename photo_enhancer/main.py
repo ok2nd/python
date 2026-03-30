@@ -61,11 +61,13 @@ class EnhancerThread(QThread):
     finished        = Signal(object)   # PIL.Image
     errorOccurred   = Signal(str)
 
-    def __init__(self, image: Image.Image, model_path: Path, intensity: float, parent=None):
+    def __init__(self, image: Image.Image, model_path: Path, intensity: float,
+                 icc_profile: bytes = None, parent=None):
         super().__init__(parent)
-        self.image      = image
-        self.model_path = model_path
-        self.intensity  = intensity   # 0.0〜1.0
+        self.image       = image
+        self.model_path  = model_path
+        self.intensity   = intensity    # 0.0〜1.0
+        self.icc_profile = icc_profile  # 元画像の ICC カラープロファイル (bytes or None)
 
     # ── メイン処理 ──────────────────────────────
     def run(self):
@@ -110,6 +112,8 @@ class EnhancerThread(QThread):
             )
 
             # ---------- 前処理 ----------
+            # ICC プロファイルを退避 (convert() で消えるため先に取得)
+            icc = self.icc_profile  # _load_image で取得済み
             img_rgb = self.image.convert("RGB")
             img_np  = np.array(img_rgb).astype(np.float32) / 255.0
 
@@ -138,6 +142,10 @@ class EnhancerThread(QThread):
             # 強度ブレンド
             if self.intensity < 1.0:
                 sr_resized = Image.blend(img_rgb, sr_resized, self.intensity)
+
+            # ICC プロファイルを結果画像に復元
+            if icc:
+                sr_resized.info["icc_profile"] = icc
 
             self.progressChanged.emit(100)
             self.statusChanged.emit("完了")
@@ -456,6 +464,7 @@ class MainWindow(QMainWindow):
         self._orig_image:  Optional[Image.Image] = None
         self._enh_image:   Optional[Image.Image] = None
         self._orig_path:   Optional[str]         = None
+        self._orig_icc:    Optional[bytes]       = None   # ICC カラープロファイル
         self._processor:   Optional[EnhancerThread] = None
 
         self._build_ui()
@@ -709,6 +718,9 @@ class MainWindow(QMainWindow):
             self._orig_path  = path
             self._enh_image  = None
 
+            # ICC カラープロファイルを保存 (JPEG/PNG/TIFF に埋め込まれている場合)
+            self._orig_icc = img.info.get("icc_profile")
+
             px = _pil_to_qpixmap(img)
             self._drop_widget.setPixmap(px)
             self._enh_widget.clear()
@@ -716,8 +728,9 @@ class MainWindow(QMainWindow):
 
             w, h = img.size
             kb   = os.path.getsize(path) / 1024
+            icc_str = f"  ICC:{len(self._orig_icc)}B" if self._orig_icc else ""
             self._lbl_status.setText(
-                f"読込完了: {Path(path).name}  [{w}×{h} px  {img.mode}  {kb:.0f} KB]"
+                f"読込完了: {Path(path).name}  [{w}×{h} px  {img.mode}  {kb:.0f} KB{icc_str}]"
             )
             self._btn_enhance.setEnabled(True)
             self._btn_save.setEnabled(False)
@@ -746,7 +759,10 @@ class MainWindow(QMainWindow):
         self._progress.setVisible(True)
         self._progress.setValue(0)
 
-        self._processor = EnhancerThread(self._orig_image, model_path, intensity)
+        self._processor = EnhancerThread(
+            self._orig_image, model_path, intensity,
+            icc_profile=self._orig_icc
+        )
         self._processor.progressChanged.connect(self._progress.setValue)
         self._processor.statusChanged.connect(self._lbl_status.setText)
         self._processor.finished.connect(self._on_done)
@@ -817,17 +833,32 @@ class MainWindow(QMainWindow):
         try:
             ext = Path(path).suffix.lower()
             img = self._enh_image.convert("RGB")
+            # ICC カラープロファイルを保存時に埋め込む
+            icc = self._orig_icc
             if ext in (".jpg", ".jpeg"):
-                img.save(path, "JPEG", quality=95, subsampling=0)
+                save_kwargs = {"quality": 95, "subsampling": 0}
+                if icc:
+                    save_kwargs["icc_profile"] = icc
+                img.save(path, "JPEG", **save_kwargs)
             elif ext == ".png":
-                img.save(path, "PNG", compress_level=6)
+                save_kwargs = {"compress_level": 6}
+                if icc:
+                    save_kwargs["icc_profile"] = icc
+                img.save(path, "PNG", **save_kwargs)
             elif ext == ".webp":
-                img.save(path, "WEBP", quality=95, method=6)
+                save_kwargs = {"quality": 95, "method": 6}
+                if icc:
+                    save_kwargs["icc_profile"] = icc
+                img.save(path, "WEBP", **save_kwargs)
             elif ext in (".tif", ".tiff"):
-                img.save(path, "TIFF", compression="lzw")
+                save_kwargs = {"compression": "lzw"}
+                if icc:
+                    save_kwargs["icc_profile"] = icc
+                img.save(path, "TIFF", **save_kwargs)
             else:
                 img.save(path)
-            self._lbl_status.setText(f"✓ 保存完了: {path}")
+            icc_msg = "  (ICCプロファイル埋込済)" if icc else "  (ICCプロファイルなし)"
+            self._lbl_status.setText(f"✓ 保存完了: {path}{icc_msg}")
         except Exception as e:
             QMessageBox.critical(self, "保存エラー", f"保存に失敗しました:\n{e}")
 
