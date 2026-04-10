@@ -585,14 +585,21 @@ class TrimApp:
             else:
                 new_h = raw_h
                 new_w = abs(new_h) * ratio * sign_w
+            # 画像境界に収まるよう比率を維持したままクランプ
+            max_w = (iw - self.create_start_ix) if sign_w > 0 else self.create_start_ix
+            max_h = (ih - self.create_start_iy) if sign_h > 0 else self.create_start_iy
+            abs_w = min(abs(new_w), max_w, max_h * ratio)
+            abs_h = abs_w / ratio
+            new_w = abs_w * sign_w
+            new_h = abs_h * sign_h
             x1 = min(self.create_start_ix, self.create_start_ix + new_w)
             y1 = min(self.create_start_iy, self.create_start_iy + new_h)
             x2 = max(self.create_start_ix, self.create_start_ix + new_w)
             y2 = max(self.create_start_iy, self.create_start_iy + new_h)
-            self.trim_x1 = max(0.0, min(x1, iw))
-            self.trim_y1 = max(0.0, min(y1, ih))
-            self.trim_x2 = max(0.0, min(x2, iw))
-            self.trim_y2 = max(0.0, min(y2, ih))
+            self.trim_x1 = x1
+            self.trim_y1 = y1
+            self.trim_x2 = x2
+            self.trim_y2 = y2
 
         else:  # resize_**
             mode = self.drag_mode
@@ -617,14 +624,21 @@ class TrimApp:
             else:
                 new_h = raw_h
                 new_w = abs(new_h) * ratio * sign_w
+            # 画像境界に収まるよう比率を維持したままクランプ
+            max_w = (iw - ax) if sign_w > 0 else ax
+            max_h = (ih - ay) if sign_h > 0 else ay
+            abs_w = min(abs(new_w), max_w, max_h * ratio)
+            abs_h = abs_w / ratio
+            new_w = abs_w * sign_w
+            new_h = abs_h * sign_h
             x1 = min(ax, ax + new_w)
             y1 = min(ay, ay + new_h)
             x2 = max(ax, ax + new_w)
             y2 = max(ay, ay + new_h)
-            self.trim_x1 = max(0.0, min(x1, iw))
-            self.trim_y1 = max(0.0, min(y1, ih))
-            self.trim_x2 = max(0.0, min(x2, iw))
-            self.trim_y2 = max(0.0, min(y2, ih))
+            self.trim_x1 = x1
+            self.trim_y1 = y1
+            self.trim_x2 = x2
+            self.trim_y2 = y2
 
         self._draw_trim_rect()
         self._update_trim_info()
@@ -706,8 +720,11 @@ class TrimApp:
             return
         x1 = int(round(min(self.trim_x1, self.trim_x2)))
         y1 = int(round(min(self.trim_y1, self.trim_y2)))
-        x2 = int(round(max(self.trim_x1, self.trim_x2)))
-        y2 = int(round(max(self.trim_y1, self.trim_y2)))
+        # 表示サイズと一致させるため、x2/y2 は x1/y1 + 表示幅で決定する
+        w  = int(abs(self.trim_x2 - self.trim_x1))
+        h  = int(abs(self.trim_y2 - self.trim_y1))
+        x2 = x1 + w
+        y2 = y1 + h
         if x2 - x1 < 1 or y2 - y1 < 1:
             messagebox.showwarning("警告", "トリミング範囲が小さすぎます")
             return
@@ -721,8 +738,10 @@ class TrimApp:
         for ch in r'\/:*?"<>|':
             ratio_name = ratio_name.replace(ch, "_")
         ratio_name = ratio_name.strip()
-        save_stem = f"{self.image_path.stem}-{ratio_name}" if ratio_name else f"{self.image_path.stem}-trim"
-        save_path = self.image_path.parent / f"{save_stem}{suffix}"
+        folder_name = ratio_name if ratio_name else "トリム"
+        save_dir = self.image_path.parent / folder_name
+        save_dir.mkdir(exist_ok=True)
+        save_path = save_dir / self.image_path.name
 
         save_kwargs = {}
         if self.icc_profile:
